@@ -2,7 +2,7 @@ import { LinearProgress, makeStyles, Typography } from "@material-ui/core";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import ReactHtmlParser from "react-html-parser";
+import parse from 'html-react-parser/dist/html-react-parser';
 import CoinInfo from "../components/CoinInfo";
 import { SingleCoin } from "../config/api";
 import { numberWithCommas } from "../components/CoinsTable";
@@ -78,6 +78,18 @@ const CoinPage = () => {
 
   const classes = useStyles();
 
+  const getDescription = () => {
+    if (!coin?.description?.en) return "";
+    const desc = coin.description.en;
+    const firstSentence = desc.split(". ")[0] + ".";
+    try {
+      return parse(firstSentence);
+    } catch (error) {
+      console.error("Error parsing description:", error);
+      return firstSentence;
+    }
+  };
+
   if (!coin) return <LinearProgress style={{ backgroundColor: "gold" }} />;
 
   return (
@@ -93,7 +105,7 @@ const CoinPage = () => {
           {coin?.name}
         </Typography>
         <Typography variant="subtitle1" className={classes.description}>
-          {ReactHtmlParser(coin?.description.en.split(". ")[0])}.
+          {getDescription()}
         </Typography>
         <div className={classes.marketData}>
           <span style={{ display: "flex" }}>
