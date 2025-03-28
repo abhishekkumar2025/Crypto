@@ -1,6 +1,6 @@
 import { LinearProgress, makeStyles, Typography } from "@material-ui/core";
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import parse from 'html-react-parser/dist/html-react-parser';
 import CoinInfo from "../components/CoinInfo";
@@ -11,19 +11,37 @@ import { CryptoState } from "../CryptoContext";
 const CoinPage = () => {
   const { id } = useParams();
   const [coin, setCoin] = useState();
+  const [prediction, setPrediction] = useState(null);
 
   const { currency, symbol } = CryptoState();
 
-  const fetchCoin = async () => {
-    const { data } = await axios.get(SingleCoin(id));
+  const fetchCoin = useCallback(async () => {
+    try {
+      const { data } = await axios.get(SingleCoin(id));
+      setCoin(data);
+    } catch (error) {
+      console.error("Error fetching coin:", error);
+    }
+  }, [id]);
 
-    setCoin(data);
-  };
+  const fetchPrediction = useCallback(async () => {
+    try {
+      const response = await axios.post('http://localhost:5000/predict', {
+        symbol: id
+      });
+      setPrediction(response.data);
+    } catch (error) {
+      console.error("Error fetching prediction:", error);
+    }
+  }, [id]);
 
   useEffect(() => {
-    fetchCoin();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const fetchData = async () => {
+      await fetchCoin();
+      await fetchPrediction();
+    };
+    fetchData();
+  }, [fetchCoin, fetchPrediction]);
 
   const useStyles = makeStyles((theme) => ({
     container: {
@@ -74,6 +92,29 @@ const CoinPage = () => {
         alignItems: "start",
       },
     },
+    prediction: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "10px",
+      padding: "15px",
+      border: "1px solid gold",
+      borderRadius: "8px",
+      marginTop: "20px",
+    },
+    predictionValue: {
+      color: (props) => props > 0 ? "rgb(14, 203, 129)" : "red",
+      fontFamily: "Montserrat",
+      fontWeight: 500
+    },
+    signal: {
+      padding: "8px 16px",
+      borderRadius: "4px",
+      fontWeight: "bold",
+      textAlign: "center",
+      backgroundColor: (props) => props > 2 ? "rgb(14, 203, 129)" : props < -2 ? "red" : "#ffd700",
+      color: (props) => props > 2 || props < -2 ? "white" : "black",
+      marginTop: "10px"
+    }
   }));
 
   const classes = useStyles();
@@ -160,6 +201,45 @@ const CoinPage = () => {
               M
             </Typography>
           </span>
+          
+          {prediction && (
+            <div className={classes.prediction}>
+              <Typography variant="h5" className={classes.heading}>
+                Price Prediction
+              </Typography>
+              <span style={{ display: "flex", alignItems: "center" }}>
+                <Typography variant="h6">
+                  Predicted Price: {symbol} {numberWithCommas(prediction.predicted_price)}
+                </Typography>
+              </span>
+              <span style={{ display: "flex", alignItems: "center" }}>
+                <Typography 
+                  variant="h6" 
+                  className={classes.predictionValue}
+                >
+                  Expected Change: {prediction.predicted_change_percent > 0 ? "+" : ""}
+                  {prediction.predicted_change_percent.toFixed(2)}%
+                </Typography>
+              </span>
+              <Typography 
+                variant="h6" 
+                className={classes.signal}
+                style={{ 
+                  backgroundColor: prediction.predicted_change_percent > 2 
+                    ? "rgb(14, 203, 129)" 
+                    : prediction.predicted_change_percent < -2 
+                      ? "red" 
+                      : "#ffd700"
+                }}
+              >
+                {prediction.predicted_change_percent > 2 
+                  ? "Strong Buy Signal" 
+                  : prediction.predicted_change_percent < -2 
+                    ? "Strong Sell Signal"
+                    : "Hold Position"}
+              </Typography>
+            </div>
+          )}
         </div>
       </div>
       <CoinInfo coin={coin} />
